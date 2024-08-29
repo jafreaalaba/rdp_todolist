@@ -57,6 +57,71 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> fetchTasksFromFirestore() async {
+    //get a reference to the 'tasks' collection from Firestore
+    CollectionReference tasksCollection = db.collection('tasks');
+
+    //Fetch the documents (tasks) from the collection
+    QuerySnapshot querySnapshot = await tasksCollection.get();
+
+    //Create an empty list to store the fetched task names
+    List<String> fetchedTasks = [];
+
+    //look through each doc (tasks) in the querySnapshot object
+    for (QueryDocumentSnapshot docSnapshot in querySnapshot.docs) {
+      //get the task name from the data
+      String taskName = docSnapshot.get('name');
+
+      //get the tasks name from the data
+      bool completed = docSnapshot.get('completed');
+
+      //add the tasks to the fetched takss
+      fetchedTasks.add(taskName);
+    }
+    setState(() {
+      tasks.clear();
+      tasks.addAll(fetchedTasks);
+    });
+  }
+
+  Future<void> updateTaskCompletionStatus(
+      String taskName, bool completed) async {
+    //get reference to the 'tasks' collectino from Firestore
+    CollectionReference tasksCollection = db.collection('tasks');
+
+    //query firestore for tasks with the given task name
+    QuerySnapshot querySnapshot =
+        await tasksCollection.where('name', isEqualTo: taskName).get();
+
+    //if matching document is found
+    if (querySnapshot.size > 0) {
+      //getting a reference to the first matching document
+      DocumentSnapshot documentSnapshot = querySnapshot.docs[0];
+
+      await documentSnapshot.reference.update({'completed': completed});
+    }
+
+    setState(() {
+      //find the index of the task in the task list
+      int taskIndex = tasks.indexWhere((task) => task == taskName);
+
+      //Update the corresponding checkbox value in the checkbox list
+      checkboxes[taskIndex] = completed;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    fetchTasksFromFirestore();
+  }
+
+  void clearInput() {
+    setState(() {
+      nameController.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,11 +144,15 @@ class _HomePageState extends State<HomePage> {
         ),
         body: Stack(
           children: [
-            Container(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/rdplogonew.jpg'),
-                  fit: BoxFit.cover,
+            SizedBox(
+              height: 500,
+              width: 450,
+              child: Container(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage('assets/rdpmeansmore.png'),
+                    fit: BoxFit.fill,
+                  ),
                 ),
               ),
             ),
@@ -149,6 +218,8 @@ class _HomePageState extends State<HomePage> {
                                                 setState(() {
                                                   checkboxes[index] = newValue!;
                                                 });
+                                                updateTaskCompletionStatus(
+                                                    tasks[index], newValue!);
                                                 //To-Do: updateTaskCompletionStatus()
                                               }),
                                         ),
@@ -209,6 +280,7 @@ class _HomePageState extends State<HomePage> {
                     child: ElevatedButton(
                       onPressed: () {
                         addItemToList();
+                        clearInput();
                       },
                       style: ButtonStyle(
                         backgroundColor: WidgetStatePropertyAll(
